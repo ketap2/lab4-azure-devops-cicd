@@ -6,7 +6,9 @@ pool:
 
 variables:
   buildConfiguration: "Release"
-  projectPath: "**/StringExtensions.csproj"
+  libraryProject: "**/StringExtensions.csproj"
+  testProject: "**/StringTesterApp.csproj"
+  nugetFeedName: "Lab4-CICD-301283759-KetaPatel/StringUtilitiesFeed"
 
 steps:
   - task: UseDotNet@2
@@ -17,24 +19,24 @@ steps:
       installationPath: $(Agent.ToolsDirectory)/dotnet
 
   - task: DotNetCoreCLI@2
-    displayName: "Restore NuGet packages"
+    displayName: "Restore NuGet packages - Library"
     inputs:
       command: "restore"
-      projects: "$(projectPath)"
+      projects: "$(libraryProject)"
       feedsToUse: "select"
 
   - task: DotNetCoreCLI@2
-    displayName: "Build project"
+    displayName: "Build library project"
     inputs:
       command: "build"
-      projects: "$(projectPath)"
+      projects: "$(libraryProject)"
       arguments: "--configuration $(buildConfiguration) --no-restore"
 
   - task: DotNetCoreCLI@2
     displayName: "Create NuGet package"
     inputs:
       command: "pack"
-      packagesToPack: "$(projectPath)"
+      packagesToPack: "$(libraryProject)"
       configuration: "$(buildConfiguration)"
       packDirectory: "$(Build.ArtifactStagingDirectory)"
       versioningScheme: "off"
@@ -49,8 +51,24 @@ steps:
       command: "push"
       packagesToPush: "$(Build.ArtifactStagingDirectory)/**/*.nupkg"
       nuGetFeedType: "internal"
-      publishVstsFeed: "Lab4-CICD-301283759-KetaPatel/StringUtilitiesFeed"
+      publishVstsFeed: "$(nugetFeedName)"
       allowPackageConflicts: true
+
+  # Verify the package works by building and running the test app
+  - task: DotNetCoreCLI@2
+    displayName: "Restore NuGet packages - Test App"
+    inputs:
+      command: "restore"
+      projects: "$(testProject)"
+      feedsToUse: "select"
+      vstsFeed: "$(nugetFeedName)"
+
+  - task: DotNetCoreCLI@2
+    displayName: "Build test app"
+    inputs:
+      command: "build"
+      projects: "$(testProject)"
+      arguments: "--configuration $(buildConfiguration) --no-restore"
 
   - task: PublishPipelineArtifact@1
     displayName: "Publish Artifacts"
