@@ -1,0 +1,60 @@
+trigger:
+  - main
+
+pool:
+  name: "LabSelfHosted"
+
+variables:
+  buildConfiguration: "Release"
+  projectPath: "**/StringExtensions.csproj"
+
+steps:
+  - task: UseDotNet@2
+    displayName: "Use .NET 8 SDK"
+    inputs:
+      packageType: "sdk"
+      version: "8.0.x"
+      installationPath: $(Agent.ToolsDirectory)/dotnet
+
+  - task: DotNetCoreCLI@2
+    displayName: "Restore NuGet packages"
+    inputs:
+      command: "restore"
+      projects: "$(projectPath)"
+      feedsToUse: "select"
+
+  - task: DotNetCoreCLI@2
+    displayName: "Build project"
+    inputs:
+      command: "build"
+      projects: "$(projectPath)"
+      arguments: "--configuration $(buildConfiguration) --no-restore"
+
+  - task: DotNetCoreCLI@2
+    displayName: "Create NuGet package"
+    inputs:
+      command: "pack"
+      packagesToPack: "$(projectPath)"
+      configuration: "$(buildConfiguration)"
+      packDirectory: "$(Build.ArtifactStagingDirectory)"
+      versioningScheme: "off"
+      nobuild: true
+
+  - task: NuGetAuthenticate@1
+    displayName: "NuGet Authenticate"
+
+  - task: NuGetCommand@2
+    displayName: "Push package to Azure Artifacts"
+    inputs:
+      command: "push"
+      packagesToPush: "$(Build.ArtifactStagingDirectory)/**/*.nupkg"
+      nuGetFeedType: "internal"
+      publishVstsFeed: "Lab4-CICD-301283759-KetaPatel/StringUtilitiesFeed"
+      allowPackageConflicts: true
+
+  - task: PublishPipelineArtifact@1
+    displayName: "Publish Artifacts"
+    inputs:
+      targetPath: "$(Build.ArtifactStagingDirectory)"
+      artifact: "NuGetPackages"
+      publishLocation: "pipeline"
